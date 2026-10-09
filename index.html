@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer-when-downgrade">
+<title>Klo Kompass</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e7490">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<style>
+:root{--bg:#f4f7f8;--card:#fff;--tx:#0f1f26;--mu:#5b6b73;--bd:#d9e2e6;--ac:#0e7490;--st:#f59e0b;--ok:#dcfce7;--okt:#166534;--bad:#fee2e2;--badt:#991b1b;--pay:#fef3c7;--payt:#92400e;--acs:#e0f2f7;--em:#e11d48}
+
+/* Themes */
+[data-theme=dark]{--bg:#0f1a1f;--card:#18262d;--tx:#e8f1f4;--mu:#9bb0b8;--bd:#2b3f48;--acs:#12343f;--ok:#12372a;--okt:#86efac;--bad:#450a0a;--badt:#fca5a5;--pay:#3b2e0f;--payt:#fcd34d}
+[data-theme=herbst]{--bg:#fdf8f6;--card:#ffffff;--tx:#2c1810;--mu:#785d54;--bd:#e8d8d0;--ac:#c2410c;--acs:#ffedd5;--st:#d97706}
+[data-theme=winter]{--bg:#f0f9ff;--card:#ffffff;--tx:#0c4a6e;--mu:#475569;--bd:#bae6fd;--ac:#0284c7;--acs:#e0f2fe;--st:#f59e0b}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+h2{font-size:17px;margin:16px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+.tap{cursor:pointer}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{justify-content:space-between}
+.mu{color:var(--mu);font-size:13px}.st{color:var(--st);letter-spacing:1px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--pay);color:var(--payt)}
+.badge.free{background:var(--ok);color:var(--okt)}.badge.ac{background:var(--acs);color:var(--ac)}
+.badge.closed{background:var(--bad);color:var(--badt)}
+.badge.verified{background:#dbeafe;color:#1e40af}
+.badge.admin{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px}
+.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:99px;padding:6px 13px;font-size:14px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;margin:4px 0 10px}
+.form-row{display:flex;gap:10px;align-items:center;margin:6px 0}
+.form-row label{margin:0;font-weight:normal;cursor:pointer}
+.form-row input[type="checkbox"]{width:auto;margin:0}
+label{font-weight:600;font-size:14px;display:block;margin-top:6px}
+button.pri{background:var(--ac);color:#fff;border:0;border-radius:12px;padding:12px;width:100%;font:inherit;font-weight:600;cursor:pointer}
+button.sec{background:var(--acs);color:var(--ac);border:0;border-radius:10px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+button.google-btn{background:#fff;color:#333;border:1px solid var(--bd);border-radius:12px;padding:10px;width:100%;font:inherit;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+button.danger{background:var(--bad);color:var(--badt);border:1px solid #fca5a5;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer}
+
+/* PWA Install Banner */
+.pwa-banner{background:var(--acs);border:1px solid var(--ac);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;color:var(--ac)}
+
+/* Zentraler Notfall-Button */
+.hero-emergency{background:linear-gradient(135deg, var(--em), #be123c);color:#fff;border:0;border-radius:16px;padding:16px;width:100%;font-size:18px;font-weight:800;box-shadow:0 6px 20px rgba(225,29,72,0.35);cursor:pointer;margin:10px 0 16px;display:flex;align-items:center;justify-content:center;gap:10px}
+.hero-emergency:active{transform:scale(0.98)}
+
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom,0px);z-index:1000}
+nav button{flex:1;background:none;border:0;color:var(--mu);padding:8px 2px;font:inherit;font-size:11px;cursor:pointer}
+nav button.on{color:var(--ac);font-weight:700}nav span{display:block;font-size:20px}
+
+/* Kartenbereich */
+#mapContainer{width:100%;height:360px;border-radius:14px;overflow:hidden;border:1px solid var(--bd);margin-bottom:12px;z-index:1}
+
+/* Modals */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:2000;padding:20px}
+.modal-overlay.open{display:flex}
+.modal-content{background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:100%;box-shadow:0 10px 25px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto}
+
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#0f1f26;color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:3000}
+#toast.s{opacity:1}.back{background:none;border:0;color:var(--ac);font:inherit;font-weight:600;padding:0 0 8px;cursor:pointer}
+.day-grid{display:grid;grid-template-columns:1fr 2fr;gap:6px;align-items:center;margin-bottom:6px}
+.wc-img{width:100%;height:180px;object-fit:cover;border-radius:12px;margin:8px 0;border:1px solid var(--bd)}
+.divider{display:flex;align-items:center;text-align:center;color:var(--mu);margin:12px 0;font-size:12px}
+.divider::before, .divider::after{content:'';flex:1;border-bottom:1px solid var(--bd)}
+.divider:not(:empty)::before{margin-right:.5em}
+.divider:not(:empty)::after{margin-left:.5em}
+</style>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<main id="app"></main>
+<nav id="nav"></nav>
+<div id="toast"></div>
+
+<!-- Login / Registrierung Modal -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal-content">
+    <div class="row sp" style="margin-bottom:12px">
+      <b id="authTitle">Anmelden</b>
+      <button class="back" onclick="closeAuthModal()">✕ Schließen</button>
+    </div>
+    <div class="mu" style="margin-bottom:10px">Für diese Aktion benötigst du ein kostenloses Konto.</div>
+    
+    <button class="google-btn" onclick="loginWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+      Mit Google anmelden
+    </button>
+
+    <div class="divider">oder mit E-Mail</div>
+
+    <label>E-Mail Adresse</label>
+    <input type="email" id="authEmail" placeholder="name@beispiel.de">
+    <label>Passwort</label>
+    <input type="password" id="authPassword" placeholder="Mindestens 6 Zeichen">
+    <button class="pri" id="authSubmitBtn" onclick="handleAuthSubmit()">Anmelden</button>
+    <div style="text-align:center;margin-top:12px">
+      <a href="javascript:void(0)" id="authToggleLink" class="mu" style="color:var(--ac)" onclick="toggleAuthMode()">Noch keinen Account? Jetzt registrieren</a>
+    </div>
+  </div>
+</div>
+
+<!-- Problem melden Modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal-content">
+    <div class="row sp" style="margin-bottom:12px">
+      <b>⚠️ Problem melden</b>
+      <button class="back" onclick="closeReportModal()">✕ Schließen</button>
+    </div>
+    <label>Was ist das Problem?</label>
+    <select id="reportReason">
+      <option value="defekt">Geschlossen / Defekt</option>
+      <option value="dreckig">Starke Verschmutzung</option>
+      <option value="klopapier">Kein Klopapier vorhanden</option>
+      <option value="falsch">Falsche Adresse / Daten</option>
+    </select>
+    <label>Kurze Beschreibung (optional)</label>
+    <textarea id="reportDetails" rows="2" placeholder="z. B. Tür klemmt oder Münzautomat defekt"></textarea>
+    <button class="pri" onclick="submitReport()">Meldung absenden</button>
+  </div>
+</div>
+
+<script>
+// ADMINS: Hier eure E-Mail-Adressen eintragen!
+const ADMIN_EMAILS = [
+  'admin@klo-kompass.de'
+];
+
+// Firebase Konfiguration
+const firebaseConfig = {
+  apiKey: "AIzaSyAREkEorLRPBaruk35_NT7sIGXYB5KaH94",
+  authDomain: "klo-kompass.firebaseapp.com",
+  databaseURL: "https://klo-kompass-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "klo-kompass",
+  storageBucket: "klo-kompass.firebasestorage.app",
+  messagingSenderId: "921099255524",
+  appId: "1:921099255524:web:8f7ce4922740f80889b6f1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+// Zustand
+let T = [], R = [], M = [];
+let currentUser = null;
+let isAdmin = false;
+let isRegisterMode = false;
+let pendingAction = null;
+let activeReportToiletId = null;
+
+let page = 'near', detail = null, q = '';
+let f = { free: false, acc: false, now: false, baby: false, euro: false, near: false };
+let me = { lat: 52.4182, lng: 9.5985 };
+let mapInstance = null;
+let deferredPrompt = null;
+
+// Einstellungen
+let navApp = 'google'; 
+let theme = 'default'; 
+let hoursType = 'same'; 
+let defaultFilters = { freeOnly: false, accOnly: false, babyOnly: false, euroOnly: false };
+
+const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+const BAD_WORDS = [
+  'scheiße', 'kacke', 'hure', 'idiot', 'miau', 'penis', 'vagina', 'arse', 'arsch',
+  'fuck', 'bitch', 'pimmel', 'wichser', 'nutte', 'scheiss', 'mist'
+];
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  render();
+});
+
+function installPWA() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => { deferredPrompt = null; render(); });
+  }
+}
+
+// Auth Listener
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  isAdmin = user && user.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  render();
+  if (user && pendingAction) {
+    const act = pendingAction;
+    pendingAction = null;
+    act();
+  }
+});
+
+// Live-Daten aus Firebase
+db.ref('toilets').on('value', snapshot => {
+  const val = snapshot.val();
+  T = val ? Object.values(val) : [];
+  render();
+});
+
+db.ref('reviews').on('value', snapshot => {
+  const val = snapshot.val();
+  R = val ? Object.values(val) : [];
+  render();
+});
+
+db.ref('reports').on('value', snapshot => {
+  const val = snapshot.val();
+  M = val ? Object.values(val) : [];
+  render();
+});
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toast = m => { const t = $('#toast'); t.textContent = m; t.className = 's'; setTimeout(() => t.className = '', 2500); };
+const fmt = n => (n || 0).toFixed(1).replace('.', ',');
+const starsH = n => { const r = Math.round(n || 0); return '★'.repeat(r) + '☆'.repeat(5 - r); };
+
+function getStatus(t) {
+  const d = new Date();
+  const dayIdx = d.getDay(); 
+  const nowMin = d.getHours() * 60 + d.getMinutes();
+
+  if (!t.opening_hours) {
+    const m = /(\d\d):(\d\d)–(\d\d):(\d\d)/.exec(t.hours || '');
+    if (!m) return { open: true, txt: t.hours || 'Unbekannt' };
+    const openMin = +m[1] * 60 + +m[2], closeMin = +m[3] * 60 + +m[4];
+    const isOpen = nowMin >= openMin && nowMin < closeMin;
+    return { open: isOpen, txt: isOpen ? `Geöffnet (${m[1]}:${m[2]}–${m[3]}:${m[4]})` : 'Geschlossen' };
+  }
+
+  const todayData = t.opening_hours[dayIdx];
+  if (!todayData || todayData.closed) return { open: false, txt: 'Heute geschlossen' };
+  if (todayData.twentyFour) return { open: true, txt: '24/7 Geöffnet' };
+
+  const [oH, oM] = (todayData.open || '08:00').split(':').map(Number);
+  const [cH, cM] = (todayData.close || '20:00').split(':').map(Number);
+  const openMin = oH * 60 + oM;
+  const closeMin = cH * 60 + cM;
+
+  if (nowMin >= openMin && nowMin < closeMin) {
+    return { open: true, txt: `Geöffnet (bis ${todayData.close} Uhr)` };
+  } else {
+    return { open: false, txt: `Geschlossen (öffnet um ${todayData.open} Uhr)` };
+  }
+}
+
+const badge = p => `<span class="badge ${p === 'Kostenlos' ? 'free' : ''}">${esc(p)}</span>`;
+const free = t => t.price === 'Kostenlos';
+const dist = t => me ? Math.round(2 * 6371000 * Math.asin(Math.sqrt(Math.sin((t.lat - me.lat) * Math.PI / 360) ** 2 + Math.cos(me.lat * Math.PI / 180) * Math.cos(t.lat * Math.PI / 180) * Math.sin((t.lng - me.lng) * Math.PI / 360) ** 2))) : null;
+const dTxt = t => { const d = dist(t); return d == null ? '' : d < 1000 ? d + ' m' : (d / 1000).toFixed(1).replace('.', ',') + ' km'; };
+
+function locate(cb) {
+  if (!navigator.geolocation) return toast('GPS wird nicht unterstützt.');
+  toast('Standort wird ermittelt …');
+  navigator.geolocation.getCurrentPosition(p => {
+    me = { lat: p.coords.latitude, lng: p.coords.longitude };
+    toast('Standort gefunden ✓');
+    cb ? cb() : render();
+  }, () => toast('Standort nicht verfügbar'), { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function quickToilet() {
+  locate(() => {
+    const openToilets = list().filter(t => getStatus(t).open).sort((a, b) => dist(a) - dist(b));
+    if (openToilets.length > 0) {
+      const nearest = openToilets[0];
+      toast(`Nächstes WC: ${nearest.name}`);
+      go('detail', nearest.id);
+    } else {
+      toast('Kein passendes, geöffnetes WC in der Nähe.');
+    }
+  });
+}
+
+function getNavUrl(lat, lng) {
+  if (navApp === 'apple') return `https://maps.apple.com/?daddr=${lat},${lng}`;
+  if (navApp === 'osm') return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=;${lat},${lng}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+}
+
+function requireAuth(action) {
+  if (currentUser) {
+    action();
+  } else {
+    pendingAction = action;
+    openAuthModal();
+  }
+}
+
+function openAuthModal() { $('#authModal').classList.add('open'); }
+function closeAuthModal() { $('#authModal').classList.remove('open'); pendingAction = null; }
+
+function openReportModal(toiletId) {
+  activeReportToiletId = toiletId;
+  $('#reportModal').classList.add('open');
+}
+function closeReportModal() { $('#reportModal').classList.remove('open'); activeReportToiletId = null; }
+
+function submitReport() {
+  requireAuth(() => {
+    if (!activeReportToiletId) return;
+    const reason = $('#reportReason').value;
+    const details = $('#reportDetails').value.trim();
+
+    const reportId = Date.now();
+    const newReport = {
+      id: reportId,
+      toilet_id: activeReportToiletId,
+      reason,
+      details: cleanInput(details),
+      created_at: new Date().toISOString().slice(0, 10),
+      user_id: currentUser.uid
+    };
+
+    db.ref('reports/' + reportId).set(newReport).then(() => {
+      toast('Vielen Dank! Meldung aufgenommen ✓');
+      closeReportModal();
+      render();
+    });
+  });
+}
+
+function adminDeleteToilet(id, e) {
+  if (e) e.stopPropagation();
+  if (!isAdmin) return;
+  if (confirm('Bist du sicher, dass du diese Toilette dauerhaft löschen möchtest?')) {
+    db.ref('toilets/' + id).remove().then(() => {
+      toast('Toilette gelöscht 🗑️');
+      if (page === 'detail') go('near');
+    });
+  }
+}
+
+function adminDeleteReview(id) {
+  if (!isAdmin) return;
+  if (confirm('Bewertung löschen?')) {
+    db.ref('reviews/' + id).remove().then(() => toast('Bewertung gelöscht 🗑️'));
+  }
+}
+
+function toggleAuthMode() {
+  isRegisterMode = !isRegisterMode;
+  $('#authTitle').textContent = isRegisterMode ? 'Registrieren' : 'Anmelden';
+  $('#authSubmitBtn').textContent = isRegisterMode ? 'Account erstellen' : 'Anmelden';
+  $('#authToggleLink').textContent = isRegisterMode ? 'Bereits registriert? Hier anmelden' : 'Noch keinen Account? Jetzt registrieren';
+}
+
+// GOOGLE AUTH
+function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider)
+    .then(() => {
+      toast('Mit Google angemeldet ✓');
+      closeAuthModal();
+    })
+    .catch(err => toast('Google-Login Fehler: ' + err.message));
+}
+
+// EMAIL AUTH
+function handleAuthSubmit() {
+  const email = $('#authEmail').value.trim();
+  const password = $('#authPassword').value.trim();
+  if (!email || !password) return toast('Bitte E-Mail und Passwort eingeben.');
+
+  if (isRegisterMode) {
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(() => { toast('Account erstellt ✓'); closeAuthModal(); })
+      .catch(err => toast('Fehler: ' + err.message));
+  } else {
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => { toast('Angemeldet ✓'); closeAuthModal(); })
+      .catch(err => toast('Fehler: ' + err.message));
+  }
+}
+
+function logout() { auth.signOut().then(() => toast('Abgemeldet 👋')); }
+
+function cleanInput(text) {
+  if (!text) return '';
+  let cleaned = text;
+  BAD_WORDS.forEach(w => {
+    const reg = new RegExp('\\b' + w + '\\b', 'gi');
+    cleaned = cleaned.replace(reg, '***');
+  });
+  return cleaned;
+}
+
+function setTheme(t) {
+  theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  toast(`Design '${t}' aktiviert ✓`);
+}
+
+const NAV = [
+  ['near', '📍', 'In der Nähe'],
+  ['map', '🗺️', 'Karte'],
+  ['add', '➕', 'Hinzufügen'],
+  ['rev', '⭐', 'Bewertungen'],
+  ['settings', '⚙️', 'Einstellungen']
+];
+
+function go(p, id) { page = p; detail = id || null; render(); scrollTo(0, 0); }
+
+function card(t) {
+  const st = getStatus(t);
+  const reportsCount = M.filter(r => r.toilet_id === t.id).length;
+
+  return `<div class="card tap" onclick="go('detail',${t.id})">
+    <div class="row sp">
+      <b>${esc(t.name)} ${t.verified ? '<span class="badge verified">✓ Verifiziert</span>' : ''}</b>
+      <div>
+        ${badge(t.price)}
+        ${isAdmin ? `<button class="danger" style="margin-left:6px" onclick="adminDeleteToilet(${t.id}, event)">🗑️ Löschen</button>` : ''}
+      </div>
+    </div>
+    <div class="mu">${esc(t.address)}, ${esc(t.city)}</div>
+    <div class="row sp" style="margin-top:6px">
+      <span><span class="st">${starsH(t.rating)}</span> <b>${fmt(t.rating)}</b> <span class="mu">(${t.review_count || 0})</span></span>
+      <span>
+        ${t.wheelchair ? '<span class="badge ac">♿ Rollstuhl</span> ' : ''}
+        ${t.euro_key ? '<span class="badge">🔑 Euro-Schlüssel</span> ' : ''}
+        ${t.baby ? '🍼 ' : ''}
+      </span>
+    </div>
+    <div class="mu" style="margin-top:4px">
+      ${me ? '📏 ' + dTxt(t) + ' · ' : ''}
+      <span class="badge ${st.open ? 'free' : 'closed'}">${st.txt}</span>
+      ${reportsCount > 0 ? `<span class="badge closed" style="margin-left:4px">⚠️ ${reportsCount} Meldung(en)</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function list() {
+  const reqFree = f.free || defaultFilters.freeOnly;
+  const reqAcc = f.acc || defaultFilters.accOnly;
+  const reqBaby = f.baby || defaultFilters.babyOnly;
+  const reqEuro = f.euro || defaultFilters.euroOnly;
+
+  return T.filter(t => (!q || (t.city + t.name + t.address).toLowerCase().includes(q.toLowerCase())) &&
+    (!reqFree || free(t)) && (!reqAcc || t.wheelchair) && (!reqEuro || t.euro_key) && (!f.now || getStatus(t).open) && (!reqBaby || t.baby)
+  ).sort((a, b) => (f.near && me) ? dist(a) - dist(b) : (b.rating || 0) - (a.rating || 0));
+}
+
+function vNear() {
+  const l = list();
+  return `<header>
+    <h1>🧭 Klo Kompass ${isAdmin ? '<span class="badge admin">Admin-Modus</span>' : ''}</h1>
+  </header>
+  
+  ${deferredPrompt ? `
+    <div class="pwa-banner">
+      <span>📲 Klo Kompass als App installieren</span>
+      <button class="sec" style="font-size:12px;padding:4px 10px" onclick="installPWA()">Installieren</button>
+    </div>
+  ` : ''}
+
+  <button class="hero-emergency" onclick="quickToilet()">🚨 Jetzt Klo finden!</button>
+
+  <input id="q" placeholder="Ort oder Adresse suchen..." value="${esc(q)}" oninput="q=this.value;upd()">
+  <div class="chips">
+    <button class="chip ${f.near ? 'on' : ''}" onclick="f.near=!f.near;if(f.near)locate();else render()">📏 Nächste zuerst</button>
+    <button class="chip ${f.now ? 'on' : ''}" onclick="f.now=!f.now;render()">🕒 Jetzt geöffnet</button>
+    <button class="chip ${f.free || defaultFilters.freeOnly ? 'on' : ''}" onclick="f.free=!f.free;render()">Kostenlos</button>
+    <button class="chip ${f.acc || defaultFilters.accOnly ? 'on' : ''}" onclick="f.acc=!f.acc;render()">♿ Barrierefrei</button>
+    <button class="chip ${f.euro || defaultFilters.euroOnly ? 'on' : ''}" onclick="f.euro=!f.euro;render()">🔑 Euro-Schlüssel</button>
+  </div>
+  <div id="lst">${l.length ? l.map(card).join('') : '<p class="mu">Keine WCs gefunden.</p>'}</div>`;
+}
+
+function upd() { const l = list(); $('#lst').innerHTML = l.length ? l.map(card).join('') : '<p class="mu">Keine WCs gefunden.</p>'; }
+
+function vMap() {
+  return `<h1>Interaktive Karte</h1>
+  <div id="mapContainer"></div>
+  <h2>Toiletten in der Übersicht (${list().length})</h2>
+  ${list().map(card).join('')}`;
+}
+
+function initLeafletMap() {
+  const container = $('#mapContainer');
+  if (!container) return;
+
+  if (mapInstance) mapInstance.remove();
+
+  mapInstance = L.map('mapContainer').setView([me.lat, me.lng], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(mapInstance);
+
+  L.circleMarker([me.lat, me.lng], { radius: 8, color: '#0e7490', fillColor: '#38bdf8', fillOpacity: 0.9 })
+    .addTo(mapInstance).bindPopup('<b>Dein Standort</b>');
+
+  list().forEach(t => {
+    if (t.lat && t.lng) {
+      const marker = L.marker([t.lat, t.lng]).addTo(mapInstance);
+      marker.bindPopup(`<b>${esc(t.name)}</b><br>${esc(t.address)}<br><b>Preis:</b> ${esc(t.price)}<br><br><a href="javascript:void(0)" onclick="go('detail',${t.id})">Details ansehen →</a>`);
+    }
+  });
+
+  setTimeout(() => mapInstance.invalidateSize(), 200);
+}
+
+function vAdd() {
+  return `<h1>WC hinzufügen</h1>
+  <div class="card">
+    <label>Bezeichnung</label>
+    <input id="n" placeholder="z. B. Öffentliches WC Rathaus">
+    
+    <label>Straße &amp; Hausnummer</label>
+    <input id="a" placeholder="z. B. Rathausplatz 1">
+    
+    <label>Stadt</label>
+    <input id="c" value="Garbsen">
+    
+    <label>Foto-URL (Optional)</label>
+    <input id="img" placeholder="https://beispiel.de/klo-foto.jpg">
+
+    <button class="sec" style="margin-bottom:12px;width:100%" onclick="gps()">📡 (Optional) GPS-Standort statt Adresse nutzen</button>
+    
+    <label>Preis</label>
+    <select id="pr">
+      <option>Kostenlos</option>
+      <option>€0,50</option>
+      <option>€1,00</option>
+    </select>
+    
+    <label>Öffnungszeiten-Modus</label>
+    <select id="hoursTypeSelect" onchange="hoursType=this.value;render()">
+      <option value="same" ${hoursType==='same'?'selected':''}>Jeder Tag gleich</option>
+      <option value="custom" ${hoursType==='custom'?'selected':''}>Tage einzeln einstellen (z. B. So geschlossen)</option>
+    </select>
+
+    <div id="hoursInputs">
+      ${hoursType === 'same' ? `
+        <label>Öffnungszeit (täglich)</label>
+        <div class="row">
+          <input type="time" id="sameOpen" value="08:00" style="flex:1">
+          <span class="mu">bis</span>
+          <input type="time" id="sameClose" value="20:00" style="flex:1">
+        </div>
+      ` : `
+        <label>Öffnungszeiten pro Wochentag</label>
+        ${DAYS.map((d, idx) => `
+          <div class="day-grid">
+            <b>${DAY_NAMES[idx]}</b>
+            <div class="row">
+              <input type="checkbox" id="close_${idx}" onchange="$('#times_${idx}').style.display=this.checked?'none':'flex'">
+              <span class="mu">Geschlossen</span>
+              <div id="times_${idx}" class="row" style="flex:1">
+                <input type="time" id="open_${idx}" value="08:00">
+                <input type="time" id="closeTime_${idx}" value="20:00">
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      `}
+    </div>
+    
+    <div class="form-row" style="margin-top:10px"><input type="checkbox" id="w"><label for="w">♿ Rollstuhlgerecht</label></div>
+    <div class="form-row"><input type="checkbox" id="euro"><label for="euro">🔑 Euro-Schlüssel erforderlich</label></div>
+    <div class="form-row"><input type="checkbox" id="wt"><label for="wt">🍼 Wickeltisch vorhanden</label></div>
+    
+    <button class="pri" style="margin-top:14px" onclick="submitNewWc()">WC-Standort veröffentlichen</button>
+  </div>`;
+}
+
+function gps() { locate(() => toast('GPS-Koordinaten übernommen ✓')); }
+
+async function geocodeAddress(street, city) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(street + ', ' + city)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch (e) { console.error(e); }
+  return null;
+}
+
+async function submitNewWc() {
+  requireAuth(async () => {
+    const name = $('#n').value.trim();
+    const addr = $('#a').value.trim();
+    const city = $('#c').value.trim();
+    const imageUrl = $('#img').value.trim();
+
+    if (!name || !addr || !city) return toast('Bitte Bezeichnung, Straße und Stadt eingeben.');
+
+    const cleanedName = cleanInput(name);
+    if (cleanedName.includes('***')) {
+      return toast('Bitte verwende eine angemessene Bezeichnung.');
+    }
+
+    toast('Adresse wird gesucht …');
+    let coords = await geocodeAddress(addr, city);
+    if (!coords) { coords = me; toast('Adresse genähert übernommen.'); }
+
+    let openingHoursData = {};
+    if (hoursType === 'same') {
+      const o = $('#sameOpen').value, c = $('#sameClose').value;
+      for (let i = 0; i < 7; i++) openingHoursData[i] = { open: o, close: c, closed: false };
+    } else {
+      for (let i = 0; i < 7; i++) {
+        const isClosed = $(`#close_${i}`).checked;
+        openingHoursData[i] = { closed: isClosed, open: isClosed ? '' : $(`#open_${i}`).value, close: isClosed ? '' : $(`#closeTime_${i}`).value };
+      }
+    }
+
+    const id = Date.now();
+    const newWc = {
+      id, name: cleanedName, address: cleanInput(addr), city: cleanInput(city),
+      image_url: imageUrl, lat: coords.lat, lng: coords.lng, price: $('#pr').value,
+      wheelchair: $('#w').checked, euro_key: $('#euro').checked, baby: $('#wt').checked,
+      opening_hours: openingHoursData, rating: 0, review_count: 0, verified: false, created_by: currentUser.uid
+    };
+
+    db.ref('toilets/' + id).set(newWc).then(() => {
+      toast('Neues WC erfolgreich hinzugefügt ✓');
+      go('near');
+    });
+  });
+}
+
+function vRev() {
+  return `<h1>Bewertungen</h1>
+  <h2>Community-Bewertungen (${R.length})</h2>
+  ${R.slice().reverse().map(r => `
+    <div class="card">
+      <div class="row sp">
+        <b>${esc(r.toilet_name)}</b>
+        <div>
+          <span class="mu">${esc(r.created_at)}</span>${isAdmin ? `<button class="danger" style="margin-left:8px" onclick="adminDeleteReview(${r.id})">🗑️ Löschen</button>` : ''}
+        </div>
+      </div>
+      <div class="st">${starsH(r.rating)}</div>
+      <div>${esc(r.comment)}</div>
+      <div class="mu" style="margin-top:4px">von ${esc(r.author_email || 'Anonym')}</div>
+    </div>
+  `).join('') || '<p class="mu">Noch keine Bewertungen vorhanden.</p>'}`;
+}
+
+function vSettings() {
+  return `<h1>⚙️ Einstellungen</h1>
+  
+  <div class="card">
+    <h2>♿ Dauerhafte Standard-Filter</h2>
+    <div class="mu" style="margin-bottom:8px">Zeige mir standardmäßig nur passende Toiletten:</div>
+    <div class="form-row"><input type="checkbox" id="defAcc" ${defaultFilters.accOnly?'checked':''} onchange="defaultFilters.accOnly=this.checked;toast('Einstellung gespeichert ✓')"><label for="defAcc">Immer ♿ barrierefreie WCs</label></div>
+    <div class="form-row"><input type="checkbox" id="defEuro" ${defaultFilters.euroOnly?'checked':''} onchange="defaultFilters.euroOnly=this.checked;toast('Einstellung gespeichert ✓')"><label for="defEuro">Immer WCs mit 🔑 Euro-Schlüssel</label></div>
+    <div class="form-row"><input type="checkbox" id="defFree" ${defaultFilters.freeOnly?'checked':''} onchange="defaultFilters.freeOnly=this.checked;toast('Einstellung gespeichert ✓')"><label for="defFree">Immer kostenlose WCs</label></div>
+    <div class="form-row"><input type="checkbox" id="defBaby" ${defaultFilters.babyOnly?'checked':''} onchange="defaultFilters.babyOnly=this.checked;toast('Einstellung gespeichert ✓')"><label for="defBaby">Immer WCs mit 🍼 Wickeltisch</label></div>
+  </div>
+
+  <div class="card">
+    <h2>🎨 Erscheinungsbild / Themes</h2>
+    <label>Farbschema wählen</label>
+    <div class="chips" style="margin-bottom:10px">
+      <button class="chip ${theme==='default'?'on':''}" onclick="setTheme('default')">Türkis (Standard)</button>
+      <button class="chip ${theme==='dark'?'on':''}" onclick="setTheme('dark')">Dark Mode 🌙</button>
+      <button class="chip ${theme==='herbst'?'on':''}" onclick="setTheme('herbst')">Herbst 🍂</button>
+      <button class="chip ${theme==='winter'?'on':''}" onclick="setTheme('winter')">Winter ❄️</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗺️ Navigation &amp; Karten</h2>
+    <label>Bevorzugte Karten-App für Routenführung</label>
+    <select onchange="navApp=this.value;toast('Navigations-App gespeichert ✓')">
+      <option value="google" ${navApp==='google'?'selected':''}>Google Maps</option>
+      <option value="apple" ${navApp==='apple'?'selected':''}>Apple Maps (iOS)</option>
+      <option value="osm" ${navApp==='osm'?'selected':''}>OpenStreetMap Navigation</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>📄 Rechtliches &amp; Schülerunternehmen</h2>
+    <div class="mu"><b>Klo Kompass Schülerfirma</b> (IW Junior Projekt)</div>
+    <div class="mu" style="margin-top:4px">Niedersachsen | Landeswettbewerb</div>
+    <div style="margin-top:8px">
+      <a href="javascript:void(0)" class="mu" style="color:var(--ac)" onclick="alert('Impressum:\\nKlo Kompass Junior-Firma\\nGarbsen, Niedersachsen\\nE-Mail: kontakt@klo-kompass.de')">Impressum anzeigen</a> · 
+      <a href="javascript:void(0)" class="mu" style="color:var(--ac)" onclick="alert('Datenschutz:\\nWir verarbeiten Standortdaten ausschließlich lokal zur Routenführung. Kontodaten (E-Mail) werden sicher bei Google Firebase gespeichert.')">Datenschutz (DS-GVO)</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>👤 Benutzerkonto</h2>
+    ${currentUser ? `
+      <div class="mu" style="margin-bottom:8px">
+        Angemeldet als: <b>${esc(currentUser.email)}</b>${isAdmin ? '<br><span class="badge admin" style="margin-top:4px">Klo Kompass Administrator</span>' : ''}
+      </div>
+      <button class="sec" onclick="logout()">Abmelden</button>
+    ` : `
+      <div class="mu" style="margin-bottom:8px">Nicht angemeldet. Anmelden, um WCs oder Bewertungen zu verfassen.</div>
+      <button class="pri" onclick="openAuthModal()">Anmelden / Registrieren</button>
+    `}
+  </div>`;
+}
+
+function vDetail() {
+  const t = T.find(x => x.id === detail);
+  if (!t) return go('near');
+  const st = getStatus(t);
+  const rs = R.filter(r => r.toilet_id === t.id).reverse();
+  const reports = M.filter(m => m.toilet_id === t.id).reverse();
+
+  return `<button class="back" onclick="go('near')">← Zurück zur Übersicht</button>
+  <h1>${esc(t.name)} ${t.verified ? '<span class="badge verified">✓ Verifiziert</span>' : ''}</h1>
+  
+  ${t.image_url ? `<img src="${esc(t.image_url)}" class="wc-img" alt="Toilette Foto" onerror="this.style.display='none'">` : ''}
+
+  <div class="card">
+    <div class="row sp"><span>${esc(t.address)}, ${esc(t.city)}</span>${badge(t.price)}</div>
+    <div style="margin:8px 0"><span class="badge ${st.open?'free':'closed'}">${st.txt}</span></div>
+    <div>
+      ${t.wheelchair ? '<span class="badge ac">♿ Rollstuhlgerecht</span>' : ''} 
+      ${t.euro_key ? '<span class="badge">🔑 Euro-Schlüssel</span>' : ''} 
+      ${t.baby ? '<span class="badge">🍼 Wickeltisch</span>' : ''}
+    </div>
+    <div style="margin:10px 0"><span class="st">${starsH(t.rating)}</span> <b>${fmt(t.rating)}</b> <span class="mu">(${t.review_count || 0} Bewertungen)</span></div>
+    
+    <a href="${getNavUrl(t.lat, t.lng)}" target="_blank" rel="noopener">
+      <button class="pri" style="margin-bottom:8px">🧭 Route in ${navApp === 'apple' ? 'Apple Maps' : navApp === 'osm' ? 'OpenStreetMap' : 'Google Maps'} öffnen</button>
+    </a>
+    
+    <div class="row sp">
+      <button class="sec" style="flex:1;color:var(--em)" onclick="openReportModal(${t.id})">⚠️ Problem melden</button>
+      ${isAdmin ? `<button class="danger" style="flex:1;padding:10px" onclick="adminDeleteToilet(${t.id})">🗑️ WC Löschen (Admin)</button>` : ''}
+    </div>
+  </div>
+
+  ${reports.length > 0 ? `
+    <div class="card" style="border-color:var(--em)">
+      <b style="color:var(--em)">⚠️ Gemeldete Probleme (${reports.length})</b>${reports.map(rep => `<div class="mu" style="margin-top:4px">• <b>${esc(rep.reason)}</b>: ${esc(rep.details || 'Keine Details')} (${esc(rep.created_at)})</div>`).join('')}
+    </div>
+  ` : ''}
+
+  <h2>Bewertung abgeben</h2>
+  <div class="card">
+    <label>Sterne</label>
+    <select id="revStars"><option value="5">5 ★★★★★ (Sehr gut)</option><option value="4">4 ★★★★☆ (Gut)</option><option value="3">3 ★★★☆☆ (Mittel)</option><option value="2">2 ★★☆☆☆ (Schlecht)</option><option value="1">1 ★☆☆☆☆ (Mangelhaft)</option></select>
+    <label>Kommentar</label>
+    <textarea id="revComment" rows="3" placeholder="Wie sauber und ordentlich war die Toilette?"></textarea>
+    <button class="pri" onclick="submitReview(${t.id})">Bewertung absenden</button>
+  </div>
+
+  <h2>Bisherige Bewertungen</h2>
+  ${rs.map(r => `
+    <div class="card">
+      <div class="row sp">
+        <b>${esc(r.author_email)}</b>
+        <div>
+          <span class="mu">${esc(r.created_at)}</span>${isAdmin ? `<button class="danger" style="margin-left:6px" onclick="adminDeleteReview(${r.id})">🗑️ Löschen</button>` : ''}
+        </div>
+      </div>
+      <div class="st">${starsH(r.rating)}</div>
+      <div>${esc(r.comment)}</div>
+    </div>
+  `).join('') || '<p class="mu">Noch keine Bewertungen.</p>'}`;
+}
+
+function submitReview(toiletId) {
+  requireAuth(() => {
+    const comment = $('#revComment').value.trim();
+    const starVal = parseInt($('#revStars').value);
+
+    if (!comment) return toast('Bitte einen Kommentar eingeben.');
+
+    const cleanedComment = cleanInput(comment);
+
+    const t = T.find(x => x.id === toiletId);
+    if (!t) return;
+
+    const revId = Date.now();
+    const newRev = {
+      id: revId,
+      toilet_id: toiletId,
+      toilet_name: t.name,
+      rating: starVal,
+      comment: cleanedComment,
+      author_email: currentUser.email.split('@')[0],
+      created_at: new Date().toISOString().slice(0, 10),
+      user_id: currentUser.uid
+    };
+
+    t.rating = Math.round(((t.rating || 0) * (t.review_count || 0) + starVal) / ((t.review_count || 0) + 1) * 10) / 10;
+    t.review_count = (t.review_count || 0) + 1;
+
+    db.ref('reviews/' + revId).set(newRev);
+    db.ref('toilets/' + toiletId).set(t).then(() => {
+      toast('Bewertung gespeichert ✓');
+      render();
+    });
+  });
+}
+
+function render() {
+  const m = { near: vNear, map: vMap, add: vAdd, rev: vRev, settings: vSettings, detail: vDetail };
+  $('#app').innerHTML = m[page]();
+
+  const cur = page === 'detail' ? 'near' : page;
+  $('#nav').innerHTML = NAV.map(([k, i, l]) => `<button class="${cur === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${l}</button>`).join('');
+
+  if (page === 'map') {
+    setTimeout(initLeafletMap, 50);
+  }
+}
+
+render();
+</script>
+</body>
+</html>
